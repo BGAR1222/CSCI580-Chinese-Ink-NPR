@@ -1,13 +1,14 @@
 #version 150
 
+in float height;
 in vec3 viewPosition;
-in vec3 viewNormal;
-in vecc2 paperUV;
+in vec3 surfaceNormal;
+in vec3 viewDirection;
+in float viewdepth;
+in vecc2 terrainUV;
 
 out vec4 c;
 
-uniform float contourMin;
-uniform float contourMax;
 uniform vec3 lightDirection;
 uniform sampler2D paperTexture;
 
@@ -39,10 +40,11 @@ float calculateThickness(float depth, float diffuse){
 float calculateSilhouette(vec3 N, vec3 V, float thickness){
     float facing = abs(dot(notmalize(N), normalize(V)));
 
-    float baseWidth = contourMax - contourMin;
+    const float contourStart = 0.05;
+    const float contourEnd = 0.25;
 
-    float adjustMax = clamp(contourMin + baseWidth * thickness, contourMin + 0.00001, 1.0);
-    return 1.0 - smoothstep(contourMin, adjustMax, facing);
+    float adjustEnd = clamp(contourStart + (contourEnd - contourStart) * thickness, contourStart + 0.00001, 1.0);
+    return 1.0 - smoothstep(contourStart, adjustMax, facing);
 }
 
 float calculateOmission(vec2 uv){
@@ -53,13 +55,12 @@ float calculateOmission(vec2 uv){
 }
 
 void main(){
-    vec3 N = normalize(ViewNormal);
-    vec3 V = normalize(-viewPosition);
-    float depth = length(viewPosition);
+    vec3 N = normalize(surfaceNormal);
+    vec3 V = normalize(viewDirection);
     float diffuse = calcaulateBrightness(N);
-    float thickness = calculateThickness(depth, diffuse);
+    float thickness = calculateThickness(viewDepth, diffuse);
     float silhouette = calculateSilhouette(N, V, thickness);
-    float omission = calculateOmission(paperUV);
+    float omission = calculateOmission(terrainUV);
     float contour = clamp(silhouette * omission, 0.0, 1.0);
 
     //testing
