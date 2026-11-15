@@ -68,7 +68,7 @@ float terrainScale[3] = { 1.0f, 1.0f, 1.0f };
 // Width and height of the OpenGL window, in pixels.
 int windowWidth = 1280;
 int windowHeight = 720;
-char windowTitle[512] = "CSCI 580 Procedural Terrain";
+char windowTitle[512] = "CSCI580 Chinese Ink NPR";
 
 int numVertices;
 
@@ -488,7 +488,8 @@ void initScene(int argc, char *argv[])
   // A pipeline program contains our shaders. Different pipeline programs may contain different shaders.
   pipelineProgram = new PipelineProgram(); // Load and set up the pipeline program, including its shaders.
   // Load and set up the pipeline program, including its shaders.
-  if (pipelineProgram->BuildShadersFromFiles(shaderBasePath, "vertexShader.glsl", "fragmentShader.glsl") != 0)
+  if (pipelineProgram->BuildShadersFromFiles(shaderBasePath, 
+    "inkCommonVertex.glsl","inkCompositeFragment.glsl") != 0)
   {
     cout << "Failed to build the pipeline program." << endl;
     throw 1;

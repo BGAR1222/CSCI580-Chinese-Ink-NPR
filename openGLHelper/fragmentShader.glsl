@@ -6,48 +6,42 @@ in vec3 viewPosition;
 
 out vec4 c;
 
-// Interior rendering
-
-// Li's method for stratify the color of ink black & white (equation 6).
-float DiffuseLightLaddering(float dif)
-{
-  float result = 0.1; //default value if diffuse >= 0.725
-  float lerp= 0.0; // t in lerp(a,b,t)
-  if (dif <= 0.025){
-    result = 1;
-  }
-  if (dif <=  0.275){
-    float lerp= 4*(dif - 0.025);
-    result = mix(1.0, 0.7, lerp);
-  }
-  if (dif <= 0.400){
-    result = 0.7;
-  }
-  if (dif <=  0.500){
-    float lerp= 10*(dif - 0.4);
-    result = mix(0.7, 0.3, lerp);
-  }
-  if (dif <= 0.625){
-    result = 0.3;
-  }
-  if (dif <=  0.725){
-    float lerp= 10*(dif - 0.625);
-    result = mix(0.3, 0.1, lerp);
-  }
-
-  return result;
-}
-
 /*
 	The fragment shader is the last step before z-testing,blending, and output to the frame buffer
 	Similar to shadertoy we want a vec4 color as our output.
 	We only need the terrain height to color the terrain, but you can add additional inputs if you like
 */
+
 void main()
 {
+  vec3 lowestColor = vec3(168,49,247) / 255.0;
+  vec3 lowColor = vec3(247,49,148) / 255.0;
 
-  // From Li, use Lambert diffused light definition
-  // diffuse = max(dot(world_light_direction, world_normal),0)
+  vec3 highColor = vec3(247,109,49) / 255.0;
+  vec3 highestColor = vec3(247,228,49) / 255.0;
+
+ //softer and broader transition
+  vec3 terrainColor = lowestColor;
+
+  terrainColor = mix(
+    terrainColor,
+    lowColor,
+    smoothstep(0.35, 0.45, height)
+  );
+
+  terrainColor = mix(
+    terrainColor,
+    highColor,
+    smoothstep(0.45, 0.54, height)
+  );
+
+  terrainColor = mix(
+    terrainColor,
+    highestColor,
+    smoothstep(0.55, 0.68, height)
+  );
+
+
 
   //fixed viewspace direction from the terrain surface toward the light
   vec3 lightDirection = normalize(vec3(-0.5, 1.0, 0.4));
@@ -55,11 +49,26 @@ void main()
   // Re-normalize the interpolated surface normal before lighting
   vec3 normal = normalize(surfaceNormal);
 
-  // NEW: ink diffusion mimic
-  float diffuse = max(dot(lightDirection, normal), 0.0);
-  float inkDiffusion = DiffuseLightLaddering(diffuse);
+  vec3 viewDirection = normalize(-viewPosition);
 
-  // output
-  c = vec4(vec3(inkDiffusion), 1.0);
+  vec3 reflectionDirection = reflect(-lightDirection, normal);
+
+  float shininess = 32.0;
+
+  float specularStrength = pow(max(dot(viewDirection, reflectionDirection), 0.0), shininess);
+
+  float diffuseStrength = max(dot(normal,lightDirection), 0.0);
+
+  float ambientStrength = 0.2;
+
+  float lightingStrength = ambientStrength + diffuseStrength * 0.8;
+
+  vec3 litTerrainColor = terrainColor * lightingStrength;
+
+  float specularAmount = 0.35;
+
+  vec3 specularColor = vec3(1.0) * specularStrength * specularAmount;
+
+  c = vec4(litTerrainColor + specularColor, 1.0);
+
 }
-
