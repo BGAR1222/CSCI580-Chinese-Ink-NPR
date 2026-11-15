@@ -15,21 +15,21 @@ float DiffuseLightLaddering(float dif)
     result = 1;
   }
   else if (dif <=  0.275){
-    float lerp= 4*(dif - 0.025);
+    lerp= 4*(dif - 0.025);
     result = mix(1.0, 0.7, lerp);
   }
   else if (dif <= 0.400){
     result = 0.7;
   }
   else if (dif <=  0.500){
-    float lerp= 10*(dif - 0.4);
+    lerp= 10*(dif - 0.4);
     result = mix(0.7, 0.3, lerp);
   }
   else if (dif <= 0.625){
     result = 0.3;
   }
   else if (dif <=  0.725){
-    float lerp= 10*(dif - 0.625);
+    lerp= 10*(dif - 0.625);
     result = mix(0.3, 0.1, lerp);
   }
 
