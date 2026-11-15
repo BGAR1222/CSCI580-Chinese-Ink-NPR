@@ -37,7 +37,7 @@ float calculateThickness(float depth, float diffuse){
 }
 
 float calculateSilhouette(vec3 N, vec3 V, float thickness){
-    float facing = abs(dot(notmalize(N), normalize(V)));
+    float facing = abs(dot(normalize(N), normalize(V)));
 
     float baseWidth = contourMax - contourMin;
 
