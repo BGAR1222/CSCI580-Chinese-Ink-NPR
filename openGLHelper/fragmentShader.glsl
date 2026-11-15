@@ -72,4 +72,3 @@ void main()
   c = vec4(litTerrainColor + specularColor, 1.0);
 
 }
-
