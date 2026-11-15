@@ -1,23 +1,32 @@
-# CSCI 580 Terrain Generation
-USC username: jiaruipe
+# CSCI 580 Chinses Ink NPR
+Team Members: 
+Allan Tsai awtsai@usc.edu
+Nathan Liu liunatha@usc.edu
+Jiarui Peng jiaruipe@usc.edu
+Yinan Zhang yinanz56@usc.edu
 
-## Overview
-The program generates a procedural mountain terrain.
-The CPU generates a fractal Perlin noise texture.
-The vertex shader uses the texture for displacement, and the fragment shader creates 4 height-based colors.
-I used bright pink, purple, yellow, and orange colors to give the terrain a psychedelic appearance.
+## Overview (Proposal)
+Our project aims to make a real-time non-photorealistic rendering that transforms 3D scenes/objects into the visual style of traditional Chinese ink and wash paintings. The project involves 3D transformations, rasterization, lighting, texture mapping, depth testing, and programmable shaders. We will use custom GPU shaders to create these specific effects, apply the knowledge from Lecture 6 to generate ink-wash color gradients by modifying Phong diffuse lighting and Lecture 8 to add noise for creating brushstrokes and rice paper textures. We will also build on techniques from the OpenGL Terrain assignment, including model transformations, surface-normal calculations, lighting, procedural noise, and interactive camera controls. The new topics we need to learn include non-photorealistic rendering, view-dependent contour-line detection, irregular ink-tone generation, and simple screen-space ink diffusion. Our primary technical references would be from Li and Li [1] that focus on animal models, utilizes controllable contour lines, quantized diffuse shading, noise mapping, and paper texture compositing. Our visual style is inspired by the game TENSEI [3]. According to an interview with its development team, the game’s environmental assets were modeled, then covered with hand-painted ink-wash textures, and then rendered with Unity Shader Graph[2]. In contrast, our project will focus on generating the ink-wash appearance procedurally in real time from 3D geometry, surface normals, lighting, textures, and the camera’s viewing direction using custom OpenGL/GLSL shaders. The final program will allow users to move the camera, adjust various ink-wash rendering parameters, and switch between traditional Phong rendering and Chinese ink-wash style rendering.
 
-## Features
-- A 50 x 50 grid mesh rendered as 4,802 triangles.
-- A 256 x 256 fractal Perlin noise texture generated on the CPU.
-- The Vertex Shader uses the texture to displace terrain vertices.
-- The Fragment Shader creates four height-based colors.
-- The fractal noise combines four octaves to add smaller terrain details.
 
-## Extra Feature
-The vertex shader samples neighboring height values to calculate the terrain slope.
-2 tangent vectors and a cross product are used to derive the surface normal.
-The normal is passed to the fragment shader, which applies ambient, diffuse, and specular lighting using Phong shading.
+## Extra Features
+
+We will try different NPR methods for the ink paintings and come up with our own method that mimics these styles, compare and contrast to the Li and Li [1]'s papers.
+
+## Expected Code and Middleware
+
+- C++ for application logic, scene management, camera controls, and render-pass management.
+- OpenGL for real-time mesh rendering and framebuffer-based post-processing.
+- GLSL vertex and fragment shaders for transformations, lighting, contour detection, ink-tone quantization, texture sampling, and final compositing.
+- Multiple render passes and framebuffer objects for ink diffusion, edge processing, and paper-texture compositing.
+- GLEW for access to OpenGL functionality.
+- FreeGLUT for window creation and keyboard/mouse input.
+- GLM or the course-provided matrix/vector classes for transformations and vector calculations.
+- The course-provided OBJ loader, or a small OBJ-loading library, for importing the animal model.
+- `stb_image` or the course ImageIO library for loading noise, brush, and rice-paper textures.
+- Blender, if necessary, for inspecting, simplifying, or preparing 3D assets; Blender will not perform the final runtime rendering.
+- Git/GitHub for version control and collaboration.
+
 
 ## Controls
 The following camera controls are provided by the starter code:
@@ -32,26 +41,16 @@ The following camera controls are provided by the starter code:
 - Esc key: Exit the program.
 
 ## Build and Run
-This project was built on Windows using Visual Studio 2022 with the v143 platform toolset.
 
-1. Open a PowerShell terminal in the `Terrain` folder.
-2. Build the Debug Win32 configuration:
-   `& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" ".\terrain.sln" /t:Build /p:Configuration=Debug /p:Platform=Win32`
-3. Run the compiled program:
-   `& ".\Bin\Debug\OpenGL Terrain.exe"`
 
-## Important Parameters
-- Grid size: 50 x 50
-- Noise texture size: 256 x 256
-- Number of octaves: 4
-- Base frequency: 4.0
-- Lacunarity: 2.0
-- Persistence: 0.5
-- Terrain amplitude: 10.0
+## Submission Media (Working)
+`FinalPresentation.mp4`: An OBS-recorded video showing the completed NPR effects from different camera views.
 
-## Submission Media
-`FinalTerrain.mp4`: An OBS-recorded video showing the completed terrain and its Phong shading from different camera views.
+## Relevant Sources
+[1] F. Li and S. Li, “Real-time Rendering of 3D Animal Models in Chinese Ink Painting Style,” 2020 International Conference on Culture-oriented Science & Technology (ICCST), Beijing, China, 2020, pp. 284–287. https://doi.org/10.1109/ICCST50977.2020.00061
 
-## Known Issues
-- No known runtime issues.
-- The Windows build may display linker warnings related to the provided JPEG library, but it completes successfully with zero errors.
+[2] Dengeki Online, “350円で買える禅アクション『点睛（TENSEI）』インタビュー。水墨画風のデザイン、操作キャラが目になった経緯、エンドレスに遊べる中毒性の秘密を紹介,” July 11, 2024. Available: https://dengekionline.com/article/202407/8658.
+
+[3] Project Pegasus, TENSEI [Video game]. NEURON-AGE, 2024. Available: https://store.steampowered.com/app/2482150/TENSEI/
+
+
