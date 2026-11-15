@@ -9,7 +9,7 @@ out vec4 c;
 uniform float contourMin;
 uniform float contourMax;
 uniform vec3 lightDirection;
-uniform sampler2D noiseTexture;
+uniform sampler2D paperTexture;
 
 uniform float lineWidth;
 uniform float omissionThreshold;
@@ -46,9 +46,9 @@ float calculateSilhouette(vec3 N, vec3 V, float thickness){
 }
 
 float calculateOmission(vec2 uv){
-    float noise = texture(noiseTexture, uv* noiseScale).r;
+    float paperNoise = texture(paperTexture, uv* noiseScale).r;
     float periodic = sin(uv.x * frequency + phase) * 0.2;
-    float pattern = noise _ periodic;
+    float pattern = paperNoise + periodic;
     return step(omissionThreshold, pattern);
 }
 
