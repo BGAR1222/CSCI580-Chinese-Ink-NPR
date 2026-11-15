@@ -8,7 +8,9 @@ Team Members:
 ## Overview (Proposal)
 Our project aims to make a real-time non-photorealistic rendering that transforms 3D scenes/objects into the visual style of traditional Chinese ink and wash paintings. The project involves 3D transformations, rasterization, lighting, texture mapping, depth testing, and programmable shaders. We will use custom GPU shaders to create these specific effects, apply the knowledge from Lecture 6 to generate ink-wash color gradients by modifying Phong diffuse lighting and Lecture 8 to add noise for creating brushstrokes and rice paper textures. We will also build on techniques from the OpenGL Terrain assignment, including model transformations, surface-normal calculations, lighting, procedural noise, and interactive camera controls. The new topics we need to learn include non-photorealistic rendering, view-dependent contour-line detection, irregular ink-tone generation, and simple screen-space ink diffusion. Our primary technical references would be from Li and Li [1] that focus on animal models, utilizes controllable contour lines, quantized diffuse shading, noise mapping, and paper texture compositing. Our visual style is inspired by the game TENSEI [3]. According to an interview with its development team, the game’s environmental assets were modeled, then covered with hand-painted ink-wash textures, and then rendered with Unity Shader Graph[2]. In contrast, our project will focus on generating the ink-wash appearance procedurally in real time from 3D geometry, surface normals, lighting, textures, and the camera’s viewing direction using custom OpenGL/GLSL shaders. The final program will allow users to move the camera, adjust various ink-wash rendering parameters, and switch between traditional Phong rendering and Chinese ink-wash style rendering.
 
-Currently in progress.
+Currently in progress (11/14)
+<img width="1292" height="756" alt="image" src="https://github.com/user-attachments/assets/81e48ae2-47c1-433b-a70a-28274f13d7a2" />
+
 
 
 ## Extra Features (In Progress)
