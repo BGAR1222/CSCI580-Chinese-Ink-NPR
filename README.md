@@ -44,6 +44,13 @@ The following camera controls are provided by the starter code:
 
 ## Build and Run
 
+On Ubuntu or WSL, open a terminal in the project root folder (`CSCI580-Chinese-Ink-NPR`) and run:
+
+```
+cd Terrain
+make
+./hw1
+```
 
 ## Submission Media (In Progress)
 `FinalPresentation.mp4`: An OBS-recorded video showing the completed NPR effects from different camera views.
