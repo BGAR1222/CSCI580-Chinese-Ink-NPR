@@ -24,6 +24,7 @@
 #include "vbo.h"
 #include "vao.h"
 #include "Texture.h"
+#include "PaperTexture.h"
 
 #include <iostream>
 #include <cstring>
@@ -79,6 +80,8 @@ VBO * vboVertices = nullptr;
 VBO * vboColors = nullptr;
 VAO * vao = nullptr;
 Texture * noiseTexture = nullptr;
+std::unique_ptr<Texture> paperTexture;
+bool paperEffects = true;
 
 //feel free to mess with the gradient grid size
 const int gradientGridSize = 50;
@@ -266,6 +269,10 @@ void idleFunc()
 //handle window resizing
 void reshapeFunc(int w, int h)
 {
+  w = w > 0 ? w : 1;
+  h = h > 0 ? h : 1;
+  windowWidth = w;
+  windowHeight = h;
   glViewport(0, 0, w, h);
 
   // When the window has been resized, we need to re-set our projection matrix.
@@ -405,6 +412,11 @@ void keyboardFunc(unsigned char key, int x, int y)
       // Take a screenshot.
       saveScreenshot("screenshot.jpg");
     break;
+
+    case 'p':
+      paperEffects = !paperEffects;
+      cout << "Paper effects: " << (paperEffects ? "on" : "off") << endl;
+    break;
   }
 }
 
@@ -455,6 +467,15 @@ void displayFunc()
   pipelineProgram->Bind();
   pipelineProgram->SetUniformVariableMatrix4fv("modelViewMatrix", GL_FALSE, modelViewMatrix);
   pipelineProgram->SetUniformVariableMatrix4fv("projectionMatrix", GL_FALSE, projectionMatrix);
+
+  // Toggle all member-4 effects for comparison.
+  glUniform2f(pipelineProgram->GetUniformVariableHandle("viewportSize"),
+              static_cast<float>(windowWidth), static_cast<float>(windowHeight));
+  pipelineProgram->SetUniformVariablef("paperStrength", paperEffects ? 1.0f : 0.0f);
+  pipelineProgram->SetUniformVariablef("brushStrength", paperEffects ? 0.35f : 0.0f);
+  pipelineProgram->SetUniformVariablef("diffusionStrength", paperEffects ? 0.5f : 0.0f);
+  paperTexture->Bind(GL_TEXTURE1);
+  noiseTexture->Bind(GL_TEXTURE0);
 
   // Execute the rendering.
   // Bind the VAO that we want to render. Remember, one object = one VAO. 
@@ -515,6 +536,12 @@ void initScene(int argc, char *argv[])
   pipelineProgram->SetUniformVariablei("noiseTexture", 0);
   pipelineProgram->SetUniformVariablef("amplitude", 10.0f);
   pipelineProgram->Bind();
+
+  paperTexture = createPaperTexture(512, 580);
+  paperTexture->Bind(GL_TEXTURE1);
+  pipelineProgram->SetUniformVariablei("paperTexture", 1);
+  pipelineProgram->SetUniformVariablef("noiseScale", 1.0f);
+  noiseTexture->Bind(GL_TEXTURE0);
 
   const int gridRows = 50;
   const int gridColumns = 50;

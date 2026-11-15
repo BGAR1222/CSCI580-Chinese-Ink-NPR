@@ -52,11 +52,14 @@ vec3 compositePaperInk(float inputDensity, vec2 paperUV, vec2 pixelPosition)
     float edgeWeight = 4.0 * density * (1.0 - density);
     density = mix(density, wetDensity, wetness * edgeWeight);
 
-    // Elongated noise creates brush gaps; Gaussian grain breaks them up.
-    float streak = valueNoise(p * vec2(0.035, 0.45));
-    float speckle = clamp(0.5 + 0.18 * gaussianGrain(p * 0.5), 0.0, 1.0);
-    float brush = 0.65 * streak + 0.35 * speckle;
-    float coverage = smoothstep(0.32, 0.58, brush);
+    // Fine grain and sparse, irregular pores.
+    vec2 warped = p + 3.0 * vec2(valueNoise(p * 0.065),
+                                valueNoise(p * 0.065 + vec2(37, 91)));
+    float pores = valueNoise(warped * 0.7);
+    float gaps = 1.0 - smoothstep(0.12, 0.28, pores);
+    float grainNoise = clamp(gaussianGrain(p * 0.75), -2.0, 2.0);
+    float roughness = clamp(1.0 - 0.08 * max(grainNoise, 0.0), 0.75, 1.0);
+    float coverage = roughness * (1.0 - 0.55 * gaps);
     density *= mix(1.0, coverage, clamp(brushStrength, 0.0, 1.0));
 
     return mix(paper, vec3(0.04, 0.045, 0.04), clamp(density, 0.0, 1.0));
