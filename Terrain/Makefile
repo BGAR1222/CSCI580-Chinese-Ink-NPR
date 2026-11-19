@@ -1,7 +1,7 @@
 LIB_CODE_BASE=../openGLHelper
 
-HW1_CXX_SRC=mainTerrain.cpp Texture.cpp PaperTexture.cpp
-HW1_HEADER=
+HW1_CXX_SRC=mainTerrain.cpp Texture.cpp PaperTexture.cpp ObjLoader.cpp
+HW1_HEADER=ObjLoader.h
 HW1_OBJ=$(notdir $(patsubst %.cpp,%.o,$(HW1_CXX_SRC)))
 
 LIB_CODE_CXX_SRC=$(wildcard $(LIB_CODE_BASE)/*.cpp)

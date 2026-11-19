@@ -18,6 +18,7 @@
     <ClCompile Include="..\openGLHelper\vbo.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="PaperTexture.cpp" />
+    <ClCompile Include="ObjLoader.cpp" />
     <ClCompile Include="mainTerrain.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -29,6 +30,7 @@
     <ClInclude Include="..\openGLHelper\pipelineProgram.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="PaperTexture.h" />
+    <ClInclude Include="ObjLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\openGLHelper\fragmentShader.glsl" />
