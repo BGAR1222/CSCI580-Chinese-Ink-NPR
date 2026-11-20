@@ -76,5 +76,8 @@
     <None Include="..\openGLHelper\vertexShader.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="..\openGLHelper\inkModelVertex.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

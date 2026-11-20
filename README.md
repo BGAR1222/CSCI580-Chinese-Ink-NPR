@@ -42,6 +42,7 @@ The following camera controls are provided by the starter code:
 - Shift + left mouse drag: Scale along the X and Y axes.
 - Shift + middle mouse drag: Scale along the Z axis.
 - X key: Save a screenshot.
+- P key: Toggle the paper, brush, and ink diffusion effects.
 - Esc key: Exit the program.
 
 ## Build and Run
@@ -53,6 +54,22 @@ cd Terrain
 make
 ./hw1
 ```
+
+To preview a local OBJ instead of procedural terrain, pass its path at launch.
+
+```sh
+./hw1 --obj "/path/to/model.obj"
+```
+
+On Windows, run the following from the project root after building Debug / Win32.
+
+```powershell
+& ".\Terrain\Bin\Debug\OpenGL Terrain.exe" --obj "C:\path\to\model.obj"
+```
+
+The preview centers and scales the mesh to fit the camera. It uses the project's
+ink shader for shading and accepts OBJ geometry, normals, and UVs. Provide a local
+OBJ file when running this command.
 
 ## Submission Media (In Progress)
 `FinalPresentation.mp4`: An OBS-recorded video showing the completed NPR effects from different camera views.

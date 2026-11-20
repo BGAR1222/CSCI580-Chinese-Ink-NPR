@@ -25,12 +25,16 @@
 #include "vao.h"
 #include "Texture.h"
 #include "PaperTexture.h"
+#include "ObjLoader.h"
 
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <glm/glm.hpp>
 
 #if defined(WIN32) || defined(_WIN32)
@@ -77,11 +81,13 @@ int numVertices;
 OpenGLMatrix matrix;
 PipelineProgram * pipelineProgram = nullptr;
 VBO * vboVertices = nullptr;
-VBO * vboColors = nullptr;
+std::unique_ptr<VBO> vboNormals;
+std::unique_ptr<VBO> vboModelUVs;
 VAO * vao = nullptr;
 Texture * noiseTexture = nullptr;
 std::unique_ptr<Texture> paperTexture;
 bool paperEffects = true;
+bool viewingObj = false;
 
 //feel free to mess with the gradient grid size
 const int gradientGridSize = 50;
@@ -433,7 +439,9 @@ void displayFunc()
   //This uses the OpenGLMatrix helper class to set up the view matrix.
   matrix.SetMatrixMode(OpenGLMatrix::ModelView);
   matrix.LoadIdentity();
-  matrix.LookAt(0.0, 10.0, 5.0,
+  const double modelCameraScale = (std::max)(1.0, static_cast<double>(windowHeight) / windowWidth);
+  matrix.LookAt(0.0, viewingObj ? 2.5 * modelCameraScale : 10.0,
+                viewingObj ? 8.0 * modelCameraScale : 5.0,
                 0.0, 0.0, 0.0,
                 0.0, 1.0, 0.0);
   // Apply interactive transforms (controlled by mouse) to the scene.
@@ -475,7 +483,8 @@ void displayFunc()
   pipelineProgram->SetUniformVariablef("brushStrength", paperEffects ? 0.35f : 0.0f);
   pipelineProgram->SetUniformVariablef("diffusionStrength", paperEffects ? 0.5f : 0.0f);
   paperTexture->Bind(GL_TEXTURE1);
-  noiseTexture->Bind(GL_TEXTURE0);
+  if (noiseTexture)
+    noiseTexture->Bind(GL_TEXTURE0);
 
   // Execute the rendering.
   // Bind the VAO that we want to render. Remember, one object = one VAO. 
@@ -491,14 +500,48 @@ void displayFunc()
 }
 
 
-// This is only called once at the beginning of the program.
-// Your Procedural mesh grid should be here.
-// You should also generate the noise texture here.
-
-void initScene(int argc, char *argv[])
+void initObjGeometry(const ObjMesh& mesh)
 {
+  // The VBO helper stores buffer sizes in an int.
+  const auto maxVertices = (std::numeric_limits<int>::max)() / (3 * sizeof(float));
+  if (mesh.vertices.size() > maxVertices)
+    throw std::runtime_error("OBJ is too large for the mesh buffer.");
 
+  glm::dvec3 minimum(mesh.vertices.front().position);
+  glm::dvec3 maximum = minimum;
+  for (const ObjVertex& vertex : mesh.vertices)
+  {
+    minimum = glm::min(minimum, glm::dvec3(vertex.position));
+    maximum = glm::max(maximum, glm::dvec3(vertex.position));
+  }
 
+  // Center the mesh and fit it inside the preview camera's view.
+  const glm::dvec3 center = (minimum + maximum) * 0.5;
+  const double scale = 7.0 / glm::length(maximum - minimum);
+  std::vector<float> positions, normals, uvs;
+  positions.reserve(mesh.vertices.size() * 3);
+  normals.reserve(mesh.vertices.size() * 3);
+  uvs.reserve(mesh.vertices.size() * 2);
+  for (const ObjVertex& vertex : mesh.vertices)
+  {
+    const glm::vec3 p((glm::dvec3(vertex.position) - center) * scale);
+    const glm::vec2 uv = vertex.hasUV ? vertex.uv : glm::vec2(p.x, p.z) / 7.0f + 0.5f;
+    positions.insert(positions.end(), {p.x, p.y, p.z});
+    normals.insert(normals.end(), {vertex.normal.x, vertex.normal.y, vertex.normal.z});
+    uvs.insert(uvs.end(), {uv.x, uv.y});
+  }
+
+  numVertices = static_cast<int>(mesh.vertices.size());
+  vboVertices = new VBO(numVertices, 3, positions.data());
+  vboNormals.reset(new VBO(numVertices, 3, normals.data()));
+  vboModelUVs.reset(new VBO(numVertices, 2, uvs.data()));
+  vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboVertices, "position");
+  vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboNormals.get(), "normal");
+  vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboModelUVs.get(), "modelUV");
+}
+
+void initScene(const ObjMesh* model)
+{
   // Set the background color.
   glClearColor(0.4f, 0.7f, 0.9f, 1.0f); // Blue color.
 
@@ -509,11 +552,10 @@ void initScene(int argc, char *argv[])
   // A pipeline program contains our shaders. Different pipeline programs may contain different shaders.
   pipelineProgram = new PipelineProgram(); // Load and set up the pipeline program, including its shaders.
   // Load and set up the pipeline program, including its shaders.
-  if (pipelineProgram->BuildShadersFromFiles(shaderBasePath, 
-    "inkCommonVertex.glsl","inkCompositeFragment.glsl") != 0)
+  const char* vertexShader = model ? "inkModelVertex.glsl" : "inkCommonVertex.glsl";
+  if (pipelineProgram->BuildShadersFromFiles(shaderBasePath, vertexShader, "inkCompositeFragment.glsl") != 0)
   {
-    cout << "Failed to build the pipeline program." << endl;
-    throw 1;
+    throw std::runtime_error("Failed to build the ink shaders.");
   } 
   cout << "Successfully built the pipeline program." << endl;
 
@@ -525,6 +567,20 @@ void initScene(int argc, char *argv[])
   // From that point on, exactly one pipeline program is bound at any moment of time.
   pipelineProgram->Bind();
 
+  paperTexture = createPaperTexture(512, 580);
+  paperTexture->Bind(GL_TEXTURE1);
+  pipelineProgram->SetUniformVariablei("paperTexture", 1);
+  pipelineProgram->SetUniformVariablef("noiseScale", 1.0f);
+  glActiveTexture(GL_TEXTURE0);
+  vao = new VAO();
+
+  if (model)
+  {
+    initObjGeometry(*model);
+    cout << "GL error status is: " << glGetError() << endl;
+    return;
+  }
+
   const int noiseTextureSize = 256;
   generateGradientGrid();
   float ** noiseValues = createPerlinTexture(noiseTextureSize);
@@ -535,13 +591,6 @@ void initScene(int argc, char *argv[])
   free(noiseValues);
   pipelineProgram->SetUniformVariablei("noiseTexture", 0);
   pipelineProgram->SetUniformVariablef("amplitude", 10.0f);
-  pipelineProgram->Bind();
-
-  paperTexture = createPaperTexture(512, 580);
-  paperTexture->Bind(GL_TEXTURE1);
-  pipelineProgram->SetUniformVariablei("paperTexture", 1);
-  pipelineProgram->SetUniformVariablef("noiseScale", 1.0f);
-  noiseTexture->Bind(GL_TEXTURE0);
 
   const int gridRows = 50;
   const int gridColumns = 50;
@@ -640,11 +689,6 @@ void initScene(int argc, char *argv[])
 
   delete [] gridPositions;  
   gridPositions = nullptr;
-  // Create the VAOs. There is a single VAO in this example.
-  // Important: this code must be executed AFTER we created our pipeline program, and AFTER we set up our VBOs.
-  // A VAO contains the geometry for a single object. There should be one VAO per object.
-  vao = new VAO();
-
   // Set up the relationship between the "position" shader variable and the VAO.
   // Important: any typo in the shader variable name will lead to malfunction.
   vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboVertices, "position");
@@ -656,9 +700,33 @@ void initScene(int argc, char *argv[])
 }
 
 
-//main, you dont need to alter this
 int main(int argc, char *argv[])
 {
+  ObjMesh model;
+  if (argc > 1 && std::strcmp(argv[1], "--obj") == 0)
+  {
+    if (argc != 3 || argv[2][0] == '\0')
+    {
+      cerr << "Usage: " << argv[0] << " [--obj <path-to-model.obj>]" << endl;
+      return EXIT_FAILURE;
+    }
+    try
+    {
+      model = loadObj(argv[2], true);
+      cout << "Loaded OBJ: " << argv[2] << " (" << model.vertices.size() / 3
+           << " triangles)" << endl;
+    }
+    catch (const std::exception& error)
+    {
+      cerr << error.what() << endl;
+      return EXIT_FAILURE;
+    }
+    viewingObj = true;
+    // Keep application arguments out of GLUT's option parser.
+    argc = 1;
+    argv[1] = nullptr;
+  }
+
   srand(static_cast<unsigned int>(time(nullptr)));
 
   cout << "Initializing GLUT..." << endl;
@@ -713,8 +781,16 @@ int main(int argc, char *argv[])
     }
   #endif
 
-  // Perform the initialization.
-  initScene(argc, argv);
+  try
+  {
+    initScene(viewingObj ? &model : nullptr);
+    model = ObjMesh{};
+  }
+  catch (const std::exception& error)
+  {
+    cerr << error.what() << endl;
+    return EXIT_FAILURE;
+  }
 
   // Sink forever into the GLUT loop.
   glutMainLoop();
