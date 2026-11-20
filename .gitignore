@@ -75,6 +75,8 @@ StyleCopReport.xml
 *.ilk
 *.meta
 *.obj
+# Track Wavefront models under Objects.
+!/Objects/**/*.obj
 *.iobj
 *.pch
 *.pdb
