@@ -26,6 +26,7 @@
 #include "Texture.h"
 #include "PaperTexture.h"
 #include "ObjLoader.h"
+#include "RenderTarget.h"
 
 #include <iostream>
 #include <cstring>
@@ -36,6 +37,7 @@
 #include <limits>
 #include <stdexcept>
 #include <glm/glm.hpp>
+#include <memory>
 
 #if defined(WIN32) || defined(_WIN32)
   #ifdef _DEBUG
@@ -80,12 +82,20 @@ int numVertices;
 // Graphics helper classes.
 OpenGLMatrix matrix;
 PipelineProgram * pipelineProgram = nullptr;
+PipelineProgram * gBufferProgram = nullptr;
+
 VBO * vboVertices = nullptr;
 std::unique_ptr<VBO> vboNormals;
 std::unique_ptr<VBO> vboModelUVs;
+
 VAO * vao = nullptr;
+VAO * gBufferVao = nullptr;
+
 Texture * noiseTexture = nullptr;
 std::unique_ptr<Texture> paperTexture;
+std::unique_ptr<RenderTarget> gBufferTarget;
+
+bool showGBufferDebug = false;
 bool paperEffects = true;
 bool viewingObj = false;
 
@@ -281,6 +291,11 @@ void reshapeFunc(int w, int h)
   windowHeight = h;
   glViewport(0, 0, w, h);
 
+  if (gBufferTarget)
+{
+    gBufferTarget->Resize(w, h);
+}
+
   // When the window has been resized, we need to re-set our projection matrix.
   matrix.SetMatrixMode(OpenGLMatrix::Projection);
   matrix.LoadIdentity();
@@ -423,6 +438,16 @@ void keyboardFunc(unsigned char key, int x, int y)
       paperEffects = !paperEffects;
       cout << "Paper effects: " << (paperEffects ? "on" : "off") << endl;
     break;
+
+    case 'g':
+    case 'G':
+      showGBufferDebug = !showGBufferDebug;
+
+      cout
+        << "G-buffer normal preview: "
+        << (showGBufferDebug ? "on" : "off")
+        << endl;
+    break;
   }
 }
 
@@ -430,73 +455,289 @@ void keyboardFunc(unsigned char key, int x, int y)
 // if you are familiar with Unity, this is similar to the Update() function but for rendering.
 void displayFunc()
 {
-  // This function performs the actual rendering.
+    // Build the model-view matrix.
+    matrix.SetMatrixMode(
+        OpenGLMatrix::ModelView
+    );
 
-  // First, clear the screen. (and the depth buffer)
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    matrix.LoadIdentity();
 
-  // Set up the camera position, focus point, and the up vector.
-  //This uses the OpenGLMatrix helper class to set up the view matrix.
-  matrix.SetMatrixMode(OpenGLMatrix::ModelView);
-  matrix.LoadIdentity();
-  const double modelCameraScale = (std::max)(1.0, static_cast<double>(windowHeight) / windowWidth);
-  matrix.LookAt(0.0, viewingObj ? 2.5 * modelCameraScale : 10.0,
-                viewingObj ? 8.0 * modelCameraScale : 5.0,
-                0.0, 0.0, 0.0,
-                0.0, 1.0, 0.0);
-  // Apply interactive transforms (controlled by mouse) to the scene.
-  // Use the helper functions on the OpenGLMatrix to compose the view/model matrix
-  // from the terrainTranslate, terrainRotate and terrainScale variables.
-  // Order: translate -> rotate X,Y,Z -> scale
-  //Note: all of thse start at the identity.
-  matrix.Translate(terrainTranslate[0], terrainTranslate[1], terrainTranslate[2]);
-  matrix.Rotate(terrainRotate[0], 1.0f, 0.0f, 0.0f);
-  matrix.Rotate(terrainRotate[1], 0.0f, 1.0f, 0.0f);
-  matrix.Rotate(terrainRotate[2], 0.0f, 0.0f, 1.0f);
-  matrix.Scale(terrainScale[0], terrainScale[1], terrainScale[2]);
+    const double modelCameraScale =
+        (std::max)(
+            1.0,
+            static_cast<double>(windowHeight)
+                / windowWidth
+        );
 
-  // Read the current modelview and projection matrices from our helper class.
-  // The matrices are only read here; nothing is actually communicated to OpenGL yet.
-  float modelViewMatrix[16]; // 16 floats, 4 by 4 homogenous matrix.
-  matrix.SetMatrixMode(OpenGLMatrix::ModelView);
-  matrix.GetMatrix(modelViewMatrix);
+    matrix.LookAt(
+        0.0f,
+        viewingObj
+            ? static_cast<float>(
+                2.5 * modelCameraScale
+              )
+            : 10.0f,
+        viewingObj
+            ? static_cast<float>(
+                8.0 * modelCameraScale
+              )
+            : 5.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f
+    );
 
-  float projectionMatrix[16];
-  matrix.SetMatrixMode(OpenGLMatrix::Projection);
-  matrix.GetMatrix(projectionMatrix);
+    matrix.Translate(
+        terrainTranslate[0],
+        terrainTranslate[1],
+        terrainTranslate[2]
+    );
 
-  // Upload the modelview and projection matrices to the GPU. Note that these are "uniform" variables.
-  // "uniforms" stay the same for all shader calls, 
-  // if you want data sent to the GPU that is the same for each vertex, fragment, ect.
-  // Important: these matrices must be uploaded to *all* pipeline programs used.
-  // In this assignment, there is only one pipeline program, but is is not uncommon to have multiple pipeline programs in a single scene.
-  // In such a case, you must separately upload to *each* pipeline program.
-  // Important: do not make a typo in the variable name below; otherwise, the program will malfunction.
-  pipelineProgram->Bind();
-  pipelineProgram->SetUniformVariableMatrix4fv("modelViewMatrix", GL_FALSE, modelViewMatrix);
-  pipelineProgram->SetUniformVariableMatrix4fv("projectionMatrix", GL_FALSE, projectionMatrix);
+    matrix.Rotate(
+        terrainRotate[0],
+        1.0f,
+        0.0f,
+        0.0f
+    );
 
-  // Toggle all member-4 effects for comparison.
-  glUniform2f(pipelineProgram->GetUniformVariableHandle("viewportSize"),
-              static_cast<float>(windowWidth), static_cast<float>(windowHeight));
-  pipelineProgram->SetUniformVariablef("paperStrength", paperEffects ? 1.0f : 0.0f);
-  pipelineProgram->SetUniformVariablef("brushStrength", paperEffects ? 0.35f : 0.0f);
-  pipelineProgram->SetUniformVariablef("diffusionStrength", paperEffects ? 0.5f : 0.0f);
-  paperTexture->Bind(GL_TEXTURE1);
-  if (noiseTexture)
-    noiseTexture->Bind(GL_TEXTURE0);
+    matrix.Rotate(
+        terrainRotate[1],
+        0.0f,
+        1.0f,
+        0.0f
+    );
 
-  // Execute the rendering.
-  // Bind the VAO that we want to render. Remember, one object = one VAO. 
-  vao->Bind();
-  //THE DRAW CALL: this sends the current opengl state from the CPU to the GPU for rendering.
-  //you may find swapping GL_TRIANGLES with GL_POINTS or GL_LINES useful for debugging. (see screenshots).
-  glDrawArrays(GL_TRIANGLES, 0, numVertices);
+    matrix.Rotate(
+        terrainRotate[2],
+        0.0f,
+        0.0f,
+        1.0f
+    );
 
-  //Swap the double-buffers.
-  //double buffering is a technique to avoid flickering and tearing when rendering animations.
-  //we essentially use two framebuffers, one for displaying the current frame, and one for rendering the next frame.
-  glutSwapBuffers();
+    matrix.Scale(
+        terrainScale[0],
+        terrainScale[1],
+        terrainScale[2]
+    );
+
+    float modelViewMatrix[16];
+
+    matrix.SetMatrixMode(
+        OpenGLMatrix::ModelView
+    );
+
+    matrix.GetMatrix(
+        modelViewMatrix
+    );
+
+    float projectionMatrix[16];
+
+    matrix.SetMatrixMode(
+        OpenGLMatrix::Projection
+    );
+
+    matrix.GetMatrix(
+        projectionMatrix
+    );
+
+    // ---------------------------------------------------------
+    // G-buffer debug path
+    // ---------------------------------------------------------
+    if (showGBufferDebug)
+    {
+        gBufferTarget->BindForWriting();
+
+        // Background pixels must have zero alpha/depth.
+        glClearColor(
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f
+        );
+
+        glClear(
+            GL_COLOR_BUFFER_BIT |
+            GL_DEPTH_BUFFER_BIT
+        );
+
+        glEnable(GL_DEPTH_TEST);
+
+        gBufferProgram->Bind();
+
+        gBufferProgram
+            ->SetUniformVariableMatrix4fv(
+                "modelViewMatrix",
+                GL_FALSE,
+                modelViewMatrix
+            );
+
+        gBufferProgram
+            ->SetUniformVariableMatrix4fv(
+                "projectionMatrix",
+                GL_FALSE,
+                projectionMatrix
+            );
+
+        // Terrain needs its height/noise texture.
+        // OBJ mode leaves noiseTexture as nullptr.
+        if (noiseTexture)
+        {
+            noiseTexture->Bind(
+                GL_TEXTURE0
+            );
+        }
+
+        gBufferVao->Bind();
+
+        glDrawArrays(
+            GL_TRIANGLES,
+            0,
+            numVertices
+        );
+
+        // Copy the G-buffer color texture to the screen.
+        //
+        // Its RGB channels contain encoded normals, so the
+        // result appears as a normal visualization.
+        glBindFramebuffer(
+            GL_READ_FRAMEBUFFER,
+            gBufferTarget->GetFramebuffer()
+        );
+
+        glReadBuffer(
+            GL_COLOR_ATTACHMENT0
+        );
+
+        glBindFramebuffer(
+            GL_DRAW_FRAMEBUFFER,
+            0
+        );
+
+        glDrawBuffer(GL_BACK);
+
+        glBlitFramebuffer(
+            0,
+            0,
+            gBufferTarget->GetWidth(),
+            gBufferTarget->GetHeight(),
+            0,
+            0,
+            windowWidth,
+            windowHeight,
+            GL_COLOR_BUFFER_BIT,
+            GL_NEAREST
+        );
+
+        // Restore normal window rendering state.
+        glBindFramebuffer(
+            GL_FRAMEBUFFER,
+            0
+        );
+
+        glViewport(
+            0,
+            0,
+            windowWidth,
+            windowHeight
+        );
+
+        glClearColor(
+            0.92f,
+            0.89f,
+            0.80f,
+            1.0f
+        );
+
+        glutSwapBuffers();
+        return;
+    }
+
+    // ---------------------------------------------------------
+    // Existing Method A rendering path
+    // ---------------------------------------------------------
+    RenderTarget::BindDefault();
+
+    glViewport(
+        0,
+        0,
+        windowWidth,
+        windowHeight
+    );
+
+    glClearColor(
+        0.92f,
+        0.89f,
+        0.80f,
+        1.0f
+    );
+
+    glClear(
+        GL_COLOR_BUFFER_BIT |
+        GL_DEPTH_BUFFER_BIT
+    );
+
+    glEnable(GL_DEPTH_TEST);
+
+    pipelineProgram->Bind();
+
+    pipelineProgram
+        ->SetUniformVariableMatrix4fv(
+            "modelViewMatrix",
+            GL_FALSE,
+            modelViewMatrix
+        );
+
+    pipelineProgram
+        ->SetUniformVariableMatrix4fv(
+            "projectionMatrix",
+            GL_FALSE,
+            projectionMatrix
+        );
+
+    glUniform2f(
+        pipelineProgram
+            ->GetUniformVariableHandle(
+                "viewportSize"
+            ),
+        static_cast<float>(windowWidth),
+        static_cast<float>(windowHeight)
+    );
+
+    pipelineProgram->SetUniformVariablef(
+        "paperStrength",
+        paperEffects ? 1.0f : 0.0f
+    );
+
+    pipelineProgram->SetUniformVariablef(
+        "brushStrength",
+        paperEffects ? 0.35f : 0.0f
+    );
+
+    pipelineProgram->SetUniformVariablef(
+        "diffusionStrength",
+        paperEffects ? 0.5f : 0.0f
+    );
+
+    paperTexture->Bind(GL_TEXTURE1);
+
+    if (noiseTexture)
+    {
+        noiseTexture->Bind(
+            GL_TEXTURE0
+        );
+    }
+
+    vao->Bind();
+
+    glDrawArrays(
+        GL_TRIANGLES,
+        0,
+        numVertices
+    );
+
+    glutSwapBuffers();
 }
 
 
@@ -538,12 +779,15 @@ void initObjGeometry(const ObjMesh& mesh)
   vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboVertices, "position");
   vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboNormals.get(), "normal");
   vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboModelUVs.get(), "modelUV");
+
+  gBufferVao->ConnectPipelineProgramAndVBOAndShaderVariable(gBufferProgram, vboVertices, "position");
+  gBufferVao->ConnectPipelineProgramAndVBOAndShaderVariable(gBufferProgram, vboNormals.get(),"normal");
 }
 
 void initScene(const ObjMesh* model)
 {
-  // Set the background color.
-  glClearColor(0.4f, 0.7f, 0.9f, 1.0f); // Blue color.
+  // Match the window background to the paper color used by the ink shader.
+  glClearColor(0.92f, 0.89f, 0.80f, 1.0f);
 
   // Enable z-buffering (i.e., hidden surface removal using the z-buffer algorithm).
   glEnable(GL_DEPTH_TEST);
@@ -557,6 +801,21 @@ void initScene(const ObjMesh* model)
   {
     throw std::runtime_error("Failed to build the ink shaders.");
   } 
+  gBufferProgram = new PipelineProgram();
+
+  if (gBufferProgram->BuildShadersFromFiles(
+        shaderBasePath,
+        vertexShader,
+        "gbufferFragment.glsl") != 0)
+  {
+    throw std::runtime_error(
+        "Failed to build the G-buffer shaders."
+    );
+  }
+
+cout
+    << "Successfully built the G-buffer program."
+    << endl;
   cout << "Successfully built the pipeline program." << endl;
 
   // Bind the pipeline program that we just created. 
@@ -569,10 +828,26 @@ void initScene(const ObjMesh* model)
 
   paperTexture = createPaperTexture(512, 580);
   paperTexture->Bind(GL_TEXTURE1);
+
+  // Tell the ink shader which texture unit contains the paper texture.
   pipelineProgram->SetUniformVariablei("paperTexture", 1);
   pipelineProgram->SetUniformVariablef("noiseScale", 1.0f);
+
+  // Restore texture unit 0 as the active unit before creating geometry.
   glActiveTexture(GL_TEXTURE0);
+
   vao = new VAO();
+  gBufferVao = new VAO();
+
+  gBufferTarget.reset(
+    new RenderTarget(
+        windowWidth,
+        windowHeight
+    )
+  );
+
+  cout << "G-buffer framebuffer created: "
+       << windowWidth << " x " << windowHeight << endl;
 
   if (model)
   {
@@ -589,8 +864,32 @@ void initScene(const ObjMesh* model)
   for (int y = 0; y < noiseTextureSize; ++y)
     free(noiseValues[y]);
   free(noiseValues);
-  pipelineProgram->SetUniformVariablei("noiseTexture", 0);
-  pipelineProgram->SetUniformVariablef("amplitude", 10.0f);
+  pipelineProgram->Bind();
+
+  pipelineProgram->SetUniformVariablei(
+      "noiseTexture",
+      0
+  );
+
+  pipelineProgram->SetUniformVariablef(
+      "amplitude",
+      10.0f
+  );
+
+  gBufferProgram->Bind();
+
+  gBufferProgram->SetUniformVariablei(
+      "noiseTexture",
+      0
+  );
+
+  gBufferProgram->SetUniformVariablef(
+      "amplitude",
+      10.0f
+  );
+
+  // Restore the normal ink program.
+  pipelineProgram->Bind();
 
   const int gridRows = 50;
   const int gridColumns = 50;
@@ -616,6 +915,15 @@ void initScene(const ObjMesh* model)
     "terrainSize",
     desiredSize
   );
+
+  gBufferProgram->Bind();
+
+  gBufferProgram->SetUniformVariablef(
+    "terrainSize",
+    desiredSize
+  );
+
+  pipelineProgram->Bind();
 
   const float columnSpacing = desiredSize / (gridColumns - 1);
   const float rowSpacing = desiredSize / (gridRows - 1);
@@ -692,6 +1000,7 @@ void initScene(const ObjMesh* model)
   // Set up the relationship between the "position" shader variable and the VAO.
   // Important: any typo in the shader variable name will lead to malfunction.
   vao->ConnectPipelineProgramAndVBOAndShaderVariable(pipelineProgram, vboVertices, "position");
+  gBufferVao->ConnectPipelineProgramAndVBOAndShaderVariable(gBufferProgram, vboVertices, "position");
 
   // Set up the relationship between the "color" shader variable and the VAO.
   // Important: any typo in the shader variable name will lead to malfunction.
