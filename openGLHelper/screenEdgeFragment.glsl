@@ -29,7 +29,7 @@ void main(){
         return;
     }
 
-        if (debugView == 3){
+    if (debugView == 3){
         fragColor = vec4(vec3(centerMask),1.0);
         return;
     }
@@ -40,7 +40,7 @@ void main(){
     float depthEdge = 0.0;
     float normalEdge = 0.0;
 
-    for(int i  = 0; i < 4, i++){
+    for(int i  = 0; i < 4; i++){
         vec4 neighbor = texture(gBufferTexture, screenUV + offsets[i] * texelSize);
         float neighborDepth = neighbor.a;
         float neighborMask = step(0.0001, neighborDepth);
@@ -53,7 +53,7 @@ void main(){
 
             depthEdge = max(depthEdge, smoothstep(depthThreshold, depthThreshold * 2.0, depthDifference));
             
-            vec3 neighborNormal = normalize(neighbor.rbg * 2.0 - 1.0);
+            vec3 neighborNormal = normalize(neighbor.rgb * 2.0 - 1.0);
 
             float normalDifference = 1.0 - clamp(dot(centerNormal, neighborNormal), -1.0, 1.0);
             normalEdge = max(normalEdge, smoothstep(normalThreshold, normalThreshold * 2.0, normalDifference));
