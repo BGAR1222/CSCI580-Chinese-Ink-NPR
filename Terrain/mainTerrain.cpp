@@ -99,6 +99,8 @@ bool showGBufferDebug = false;
 bool paperEffects = true;
 bool viewingObj = false;
 
+int methodAChangeView = 0;
+
 //feel free to mess with the gradient grid size
 const int gradientGridSize = 50;
 //this is a 2D array of unit vectors that will be used to generate the noise texture.
@@ -439,7 +441,6 @@ void keyboardFunc(unsigned char key, int x, int y)
       cout << "Paper effects: " << (paperEffects ? "on" : "off") << endl;
     break;
 
-    case 'g':
     case 'G':
       showGBufferDebug = !showGBufferDebug;
 
@@ -447,6 +448,30 @@ void keyboardFunc(unsigned char key, int x, int y)
         << "G-buffer normal preview: "
         << (showGBufferDebug ? "on" : "off")
         << endl;
+    break;
+
+    case '0':
+      methodAChangeView = 0;
+      showGBufferDebug = false;
+      cout << "Method A: Final" << endl;
+    break;
+
+    case '1':
+      methodAChangeView = 1;
+      showGBufferDebug = false;
+      cout << "Method A: Interior Ink" << endl;
+    break;
+
+    case '2':
+      methodAChangeView = 2;
+      showGBufferDebug = false;
+      cout << "Method A: Contour Lines" << endl;
+    break;
+
+    case '3':
+      methodAChangeView = 3;
+      showGBufferDebug = false;
+      cout << "Method A: Combined Ink" << endl;
     break;
   }
 }
@@ -718,6 +743,11 @@ void displayFunc()
     pipelineProgram->SetUniformVariablef(
         "diffusionStrength",
         paperEffects ? 0.5f : 0.0f
+    );
+
+    glUniform1i(
+        pipelineProgram->GetUniformVariableHandle("changeView"),
+        methodAChangeView
     );
 
     paperTexture->Bind(GL_TEXTURE1);

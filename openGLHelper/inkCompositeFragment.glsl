@@ -15,6 +15,8 @@ uniform float brushStrength;
 uniform float diffusionStrength;
 uniform float noiseScale;
 
+uniform int changeView; // 0 = final, 1 = interior ink, 2 = contour, 3 = combined
+
 float hashNoise(vec2 p)
 {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -169,6 +171,25 @@ void main()
   float contourLight = 1.0 - contourMask;
   float combinedInk = 1.0 - interiorLight * contourLight;
 
+  // Change views in window
+  if (changeView == 1){ 
+    // only show Diffuse Light Laddering 
+    c = vec4(vec3(interiorLight), 1.0);
+    return;
+  }
+
+  if (changeView == 2){
+    // only show Contour Line
+    c = vec4(vec3(contourLight), 1.0);
+    return;
+  }
+
+  if (changeView == 3){
+    // combined interior ink and contours
+    c = vec4(vec3(interiorLight * contourLight), 1.0);
+    return;
+  }
+  // final view with Background Mixing and Noise Texture Mapping
   vec2 paperUV = gl_FragCoord.xy / max(viewportSize, vec2(1.0));
   c = vec4(compositePaperInk(combinedInk, paperUV, gl_FragCoord.xy), 1.0);
 }
