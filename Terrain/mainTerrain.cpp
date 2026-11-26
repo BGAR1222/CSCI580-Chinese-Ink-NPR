@@ -83,6 +83,7 @@ int numVertices;
 OpenGLMatrix matrix;
 PipelineProgram * pipelineProgram = nullptr;
 PipelineProgram * gBufferProgram = nullptr;
+PipelineProgram * screenEdgeProgram = nullptr;
 
 VBO * vboVertices = nullptr;
 std::unique_ptr<VBO> vboNormals;
@@ -90,6 +91,7 @@ std::unique_ptr<VBO> vboModelUVs;
 
 VAO * vao = nullptr;
 VAO * gBufferVao = nullptr;
+VAO * screenEdgeVao = nullptr;
 
 Texture * noiseTexture = nullptr;
 std::unique_ptr<Texture> paperTexture;
@@ -100,6 +102,22 @@ bool paperEffects = true;
 bool viewingObj = false;
 
 int methodAChangeView = 0;
+// 0 = Method A, 1 = Method B
+int activeRenderMethod = 0;
+
+// screenEdgeFragment.glsl debug modes:
+// 0 = final/combined edge
+// 1 = normal buffer
+// 2 = depth buffer
+// 3 = object mask
+// 4 = mask edge
+// 5 = depth edge
+// 6 = normal edge
+int methodBDebugView = 0;
+
+float methodBDepthThreshold = 0.02f;
+float methodBNormalThreshold = 0.15f;
+float methodBDepthDisplayScale = 20.0f;
 
 //feel free to mess with the gradient grid size
 const int gradientGridSize = 50;
