@@ -861,10 +861,22 @@ void initScene(const ObjMesh* model)
     );
   }
 
-cout
-    << "Successfully built the G-buffer program."
-    << endl;
-  cout << "Successfully built the pipeline program." << endl;
+cout << "Successfully built the G-buffer program." << endl;
+
+  screenEdgeProgram = new PipelineProgram();
+
+if (screenEdgeProgram->BuildShadersFromFiles(
+      shaderBasePath,
+      "fullScreenVertex.glsl",
+      "screenEdgeFragment.glsl") != 0)
+{
+  throw std::runtime_error(
+      "Failed to build the screen-space edge shaders."
+  );
+}
+
+cout << "Successfully built the screen-space edge program." << endl;
+cout << "Successfully built the pipeline program." << endl;
 
   // Bind the pipeline program that we just created. 
   // The purpose of binding a pipeline program is to activate the shaders that it contains, i.e.,
@@ -886,6 +898,35 @@ cout
 
   vao = new VAO();
   gBufferVao = new VAO();
+  screenEdgeVao = new VAO();
+
+  screenEdgeProgram->Bind();
+
+// G-buffer will be bound to texture unit 2.
+// Unit 0 is already used by terrain noise.
+// Unit 1 is already used by paper texture.
+screenEdgeProgram->SetUniformVariablei(
+    "gBufferTexture",
+    2
+);
+
+screenEdgeProgram->SetUniformVariablef(
+    "depthThreshold",
+    methodBDepthThreshold
+);
+
+screenEdgeProgram->SetUniformVariablef(
+    "normalThreshold",
+    methodBNormalThreshold
+);
+
+screenEdgeProgram->SetUniformVariablef(
+    "depthDisplayScale",
+    methodBDepthDisplayScale
+);
+
+// Restore Method A as the currently active program.
+pipelineProgram->Bind();
 
   gBufferTarget.reset(
     new RenderTarget(
