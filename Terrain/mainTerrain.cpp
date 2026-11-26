@@ -459,6 +459,7 @@ void keyboardFunc(unsigned char key, int x, int y)
       cout << "Paper effects: " << (paperEffects ? "on" : "off") << endl;
     break;
 
+    case 'g':
     case 'G':
       showGBufferDebug = !showGBufferDebug;
 
@@ -492,6 +493,58 @@ void keyboardFunc(unsigned char key, int x, int y)
       cout << "Method A: Combined Ink" << endl;
     break;
   }
+}
+
+void renderGBufferPass(
+  float modelViewMatrix[16],
+  float projectionMatrix[16])
+{
+  gBufferTarget->BindForWriting();
+
+  // Background depth must remain zero so the screen-space
+  // shader can construct an object mask.
+  glClearColor(
+      0.0f,
+      0.0f,
+      0.0f,
+      0.0f
+  );
+
+  glClear(
+      GL_COLOR_BUFFER_BIT |
+      GL_DEPTH_BUFFER_BIT
+  );
+
+  glEnable(GL_DEPTH_TEST);
+
+  gBufferProgram->Bind();
+
+  gBufferProgram->SetUniformVariableMatrix4fv(
+      "modelViewMatrix",
+      GL_FALSE,
+      modelViewMatrix
+  );
+
+  gBufferProgram->SetUniformVariableMatrix4fv(
+      "projectionMatrix",
+      GL_FALSE,
+      projectionMatrix
+  );
+
+  // Terrain mode needs the height/noise texture.
+  // OBJ mode leaves noiseTexture as nullptr.
+  if (noiseTexture)
+  {
+      noiseTexture->Bind(GL_TEXTURE0);
+  }
+
+  gBufferVao->Bind();
+
+  glDrawArrays(
+      GL_TRIANGLES,
+      0,
+      numVertices
+  );
 }
 
 // This is the main display function. It is called automatically by GLUT
@@ -590,56 +643,7 @@ void displayFunc()
     // ---------------------------------------------------------
     if (showGBufferDebug)
     {
-        gBufferTarget->BindForWriting();
-
-        // Background pixels must have zero alpha/depth.
-        glClearColor(
-            0.0f,
-            0.0f,
-            0.0f,
-            0.0f
-        );
-
-        glClear(
-            GL_COLOR_BUFFER_BIT |
-            GL_DEPTH_BUFFER_BIT
-        );
-
-        glEnable(GL_DEPTH_TEST);
-
-        gBufferProgram->Bind();
-
-        gBufferProgram
-            ->SetUniformVariableMatrix4fv(
-                "modelViewMatrix",
-                GL_FALSE,
-                modelViewMatrix
-            );
-
-        gBufferProgram
-            ->SetUniformVariableMatrix4fv(
-                "projectionMatrix",
-                GL_FALSE,
-                projectionMatrix
-            );
-
-        // Terrain needs its height/noise texture.
-        // OBJ mode leaves noiseTexture as nullptr.
-        if (noiseTexture)
-        {
-            noiseTexture->Bind(
-                GL_TEXTURE0
-            );
-        }
-
-        gBufferVao->Bind();
-
-        glDrawArrays(
-            GL_TRIANGLES,
-            0,
-            numVertices
-        );
-
+      renderGBufferPass(modelViewMatrix,projectionMatrix);
         // Copy the G-buffer color texture to the screen.
         //
         // Its RGB channels contain encoded normals, so the
