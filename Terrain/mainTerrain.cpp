@@ -113,6 +113,7 @@ int activeRenderMethod = 0;
 // 4 = mask edge
 // 5 = depth edge
 // 6 = normal edge
+// 7 = combined edge
 int methodBDebugView = 0;
 
 float methodBDepthThreshold = 0.02f;
@@ -469,28 +470,98 @@ void keyboardFunc(unsigned char key, int x, int y)
         << endl;
     break;
 
+    case 'a':
+    case 'A':
+      activeRenderMethod = 0;
+      methodAChangeView = 0;
+      showGBufferDebug = false;
+      cout << "Rendering Method A: Li-inspired ink rendering" << endl;
+    break;
+
+    case 'b':
+    case 'B':
+      activeRenderMethod = 1;
+      methodBDebugView = 0;
+      showGBufferDebug = false;
+      cout << "Rendering Method B: screen-space ink rendering" << endl;
+    break;
+
     case '0':
+      activeRenderMethod = 0;
       methodAChangeView = 0;
       showGBufferDebug = false;
       cout << "Method A: Final" << endl;
     break;
 
     case '1':
+      activeRenderMethod = 0;
       methodAChangeView = 1;
       showGBufferDebug = false;
       cout << "Method A: Interior Ink" << endl;
     break;
 
     case '2':
+      activeRenderMethod = 0;
       methodAChangeView = 2;
       showGBufferDebug = false;
       cout << "Method A: Contour Lines" << endl;
     break;
 
     case '3':
+      activeRenderMethod = 0;
       methodAChangeView = 3;
       showGBufferDebug = false;
       cout << "Method A: Combined Ink" << endl;
+    break;
+
+    case '4':
+      activeRenderMethod = 1;
+      methodBDebugView = 3;
+      showGBufferDebug = false;
+      cout << "Method B: Object Mask" << endl;
+    break;
+
+    case '5':
+      activeRenderMethod = 1;
+      methodBDebugView = 4;
+      showGBufferDebug = false;
+      cout << "Method B: Mask Edge" << endl;
+    break;
+
+    case '6':
+      activeRenderMethod = 1;
+      methodBDebugView = 5;
+      showGBufferDebug = false;
+      cout << "Method B: Depth Edge" << endl;
+    break;
+
+    case '7':
+      activeRenderMethod = 1;
+      methodBDebugView = 6;
+      showGBufferDebug = false;
+      cout << "Method B: Normal Edge" << endl;
+    break;
+
+    case '8':
+      activeRenderMethod = 1;
+      methodBDebugView = 7;
+      showGBufferDebug = false;
+      cout << "Method B: Combined Edge" << endl;
+    break;
+
+    case '9':
+      activeRenderMethod = 1;
+      methodBDebugView = 1;
+      showGBufferDebug = false;
+      cout << "Method B: Normal Buffer" << endl;
+    break;
+
+    case 'd':
+    case 'D':
+      activeRenderMethod = 1;
+      methodBDebugView = 2;
+      showGBufferDebug = false;
+      cout << "Method B: Depth Buffer" << endl;
     break;
   }
 }
@@ -545,6 +616,97 @@ void renderGBufferPass(
       0,
       numVertices
   );
+}
+
+void renderMethodBScreenPass()
+{
+  RenderTarget::BindDefault();
+
+  glViewport(
+      0,
+      0,
+      windowWidth,
+      windowHeight
+  );
+
+  glClearColor(
+      0.92f,
+      0.89f,
+      0.80f,
+      1.0f
+  );
+
+  glClear(
+      GL_COLOR_BUFFER_BIT |
+      GL_DEPTH_BUFFER_BIT
+  );
+
+  // The full-screen triangle must not be rejected by geometry depth.
+  glDisable(GL_DEPTH_TEST);
+
+  screenEdgeProgram->Bind();
+
+  // Unit 1 contains the procedural paper texture. Unit 2 contains
+  // the RGBA16F G-buffer (RGB normal, A linear view-space depth).
+  paperTexture->Bind(GL_TEXTURE1);
+  gBufferTarget->BindColorTexture(GL_TEXTURE2);
+
+  screenEdgeProgram->SetUniformVariablei(
+      "gBufferTexture",
+      2
+  );
+
+  screenEdgeProgram->SetUniformVariablei(
+      "paperTexture",
+      1
+  );
+
+  glUniform2f(
+      screenEdgeProgram->GetUniformVariableHandle(
+          "texelSize"
+      ),
+      1.0f / static_cast<float>(gBufferTarget->GetWidth()),
+      1.0f / static_cast<float>(gBufferTarget->GetHeight())
+  );
+
+  screenEdgeProgram->SetUniformVariablei(
+      "debugView",
+      methodBDebugView
+  );
+
+  screenEdgeProgram->SetUniformVariablef(
+      "depthThreshold",
+      methodBDepthThreshold
+  );
+
+  screenEdgeProgram->SetUniformVariablef(
+      "normalThreshold",
+      methodBNormalThreshold
+  );
+
+  screenEdgeProgram->SetUniformVariablef(
+      "depthDisplayScale",
+      methodBDepthDisplayScale
+  );
+
+  screenEdgeProgram->SetUniformVariablef(
+      "paperStrength",
+      paperEffects ? 1.0f : 0.0f
+  );
+
+  screenEdgeVao->Bind();
+
+  // fullScreenVertex.glsl creates the triangle from gl_VertexID.
+  glDrawArrays(
+      GL_TRIANGLES,
+      0,
+      3
+  );
+
+  // Restore shared OpenGL state for Method A and the future GUI pass.
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glActiveTexture(GL_TEXTURE0);
+  glEnable(GL_DEPTH_TEST);
 }
 
 // This is the main display function. It is called automatically by GLUT
@@ -696,6 +858,22 @@ void displayFunc()
             0.80f,
             1.0f
         );
+
+        glutSwapBuffers();
+        return;
+    }
+
+    // ---------------------------------------------------------
+    // Method B: G-buffer followed by screen-space edge rendering.
+    // ---------------------------------------------------------
+    if (activeRenderMethod == 1)
+    {
+        renderGBufferPass(
+            modelViewMatrix,
+            projectionMatrix
+        );
+
+        renderMethodBScreenPass();
 
         glutSwapBuffers();
         return;
@@ -912,6 +1090,11 @@ cout << "Successfully built the pipeline program." << endl;
 screenEdgeProgram->SetUniformVariablei(
     "gBufferTexture",
     2
+);
+
+screenEdgeProgram->SetUniformVariablei(
+    "paperTexture",
+    1
 );
 
 screenEdgeProgram->SetUniformVariablef(

@@ -43,6 +43,17 @@ The following camera controls are provided by the starter code:
 - Shift + middle mouse drag: Scale along the Z axis.
 - X key: Save a screenshot.
 - P key: Toggle the paper, brush, and ink diffusion effects.
+- A key: Show the final Li-inspired Method A rendering.
+- B key: Show the final screen-space Method B rendering.
+- 0-3 keys: Show Method A final, interior-ink, contour, and combined views.
+- 4 key: Show the Method B object mask.
+- 5 key: Show the Method B object-mask edge.
+- 6 key: Show the Method B depth edge.
+- 7 key: Show the Method B normal edge.
+- 8 key: Show the Method B combined edge map.
+- 9 key: Show the Method B encoded normal buffer.
+- D key: Show the Method B linear-depth buffer.
+- G key: Toggle the direct G-buffer normal preview.
 - Esc key: Exit the program.
 
 ## Build and Run

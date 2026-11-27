@@ -3,12 +3,14 @@
 in vec2 screenUV;
 
 uniform sampler2D gBufferTexture;
+uniform sampler2D paperTexture;
 uniform vec2 texelSize;
 
 uniform int debugView;
 uniform float depthThreshold;
 uniform float normalThreshold;
 uniform float depthDisplayScale;
+uniform float paperStrength;
 
 out vec4 fragColor;
 
@@ -82,5 +84,34 @@ void main(){
         return;
     }
 
-    fragColor = vec4(vec3(1.0 - combinedEdge), 1.0);
+    if (debugView == 7)
+    {
+        fragColor = vec4(vec3(1.0 - combinedEdge), 1.0);
+        return;
+    }
+
+    // Method B final view. Unlike Method A's fixed Li-and-Li light
+    // ladder, this method uses a continuous normal-derived wash tone
+    // and reinforces it with screen-space mask, depth, and normal edges.
+    vec3 lightDirection = normalize(vec3(-0.5, 1.0, 0.4));
+    float diffuse = max(dot(centerNormal, lightDirection), 0.0);
+
+    float interiorInk = centerMask *
+        (0.08 + 0.62 * (1.0 - smoothstep(0.15, 0.90, diffuse)));
+
+    float finalInk = max(interiorInk, combinedEdge);
+
+    float paperGrain = texture(paperTexture, screenUV).r;
+    vec3 paperColor = vec3(0.92, 0.89, 0.80) *
+        (1.0 + (paperGrain - 0.5) * clamp(paperStrength, 0.0, 2.0));
+    paperColor = clamp(paperColor, 0.0, 1.0);
+
+    vec3 inkColor = vec3(0.04, 0.045, 0.04);
+    vec3 finalColor = mix(
+        paperColor,
+        inkColor,
+        clamp(finalInk, 0.0, 1.0)
+    );
+
+    fragColor = vec4(finalColor, 1.0);
 }
